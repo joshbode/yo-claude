@@ -13,7 +13,7 @@ if [[ ! -f ${SETTINGS} ]]; then
   exit 0
 fi
 
-if ! command -v jq &>/dev/null; then
+if ! command -v jq &> /dev/null; then
   echo "Error: jq is required" >&2
   exit 1
 fi
@@ -28,7 +28,7 @@ for event in "${EVENTS[@]}"; do
       if .hooks == {} then del(.hooks) else . end
     else . end
   " "${SETTINGS}")
-  echo "${UPDATED}" >"${SETTINGS}"
+  echo "${UPDATED}" > "${SETTINGS}"
 done
 
 echo "Removed yo-claude hooks from ${SETTINGS}"

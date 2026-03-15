@@ -30,11 +30,15 @@ depends = ["check:shell", "check:lua"]
 
 [tasks."check:shell"]
 description = "Lint and format-check shell scripts"
-run = """
-shellcheck hooks/yo-claude-hook.sh install.sh uninstall.sh tests/test_hook.bats
-shfmt -d hooks/yo-claude-hook.sh install.sh uninstall.sh
-shfmt --ln bats -i 2 -sr -d tests/test_hook.bats
-"""
+run = '''
+#! /usr/bin/env bash
+
+shopt -s globstar nullglob
+
+FILES=(**/*.sh **/*.bats)
+shfmt -d "${FILES[@]}"
+shellcheck "${FILES[@]}"
+'''
 
 [tasks."check:lua"]
 description = "Lint and format-check Lua files"
@@ -74,18 +78,20 @@ SH_FILES=()
 LUA_FILES=()
 while IFS= read -r file; do
   case "${file}" in
-    *.sh) SH_FILES+=("${file}") ;;
+    *.sh|*.bats) SH_FILES+=("${file}") ;;
     *.lua) LUA_FILES+=("${file}") ;;
   esac
 done < <(git diff-index --cached --name-only HEAD)
 
 if ((${#SH_FILES[@]})); then
+  shfmt -w "${SH_FILES[@]}"
+  git add -- "${SH_FILES[@]}"
   shellcheck "${SH_FILES[@]}"
-  shfmt -d "${SH_FILES[@]}"
 fi
 
 if ((${#LUA_FILES[@]})); then
-  stylua --check "${LUA_FILES[@]}"
+  stylua "${LUA_FILES[@]}"
+  git add -- "${LUA_FILES[@]}"
   mise run check:lua:types
   mise run test
 fi
@@ -109,11 +115,21 @@ echo "Installed pre-commit hook"
 
 [tasks.fmt]
 description = "Format all files"
-run = """
-shfmt -w hooks/yo-claude-hook.sh install.sh uninstall.sh
-shfmt --ln bats -i 2 -sr -w tests/test_hook.bats
-stylua editors/nvim/lua/
-"""
+depends = ["fmt:shell", "fmt:lua"]
+
+[tasks."fmt:shell"]
+description = "Format shell scripts"
+run = '''
+#! /usr/bin/env bash
+
+shopt -s globstar nullglob
+
+shfmt -w -- **/*.sh **/*.bats
+'''
+
+[tasks."fmt:lua"]
+description = "Format Lua files"
+run = "stylua editors/nvim/lua/"
 
 [tasks."hook:install"]
 description = "Install the Claude Code hook"

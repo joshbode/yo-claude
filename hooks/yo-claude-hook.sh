@@ -10,9 +10,9 @@ TRIGGER="${YO_CLAUDE_TRIGGER:-CLAUDE:}"
 STALE_MS="${YO_CLAUDE_STALE_MS:-900000}" # 15 minutes
 
 PAYLOAD=$(cat)
-CWD=$(jq -r '.cwd' <<<"${PAYLOAD}")
-EVENT=$(jq -r '.hook_event_name // "Stop"' <<<"${PAYLOAD}")
-PROMPT=$(jq -r '.prompt // ""' <<<"${PAYLOAD}")
+CWD=$(jq -r '.cwd' <<< "${PAYLOAD}")
+EVENT=$(jq -r '.hook_event_name // "Stop"' <<< "${PAYLOAD}")
+PROMPT=$(jq -r '.prompt // ""' <<< "${PAYLOAD}")
 
 # Block trivial prompts (e.g. ".") that were only meant to wake the hook
 block_if_trivial() {
@@ -23,7 +23,7 @@ block_if_trivial() {
 }
 
 # Project ID: hash of cwd (sha256sum on linux, shasum on macos)
-if command -v sha256sum &>/dev/null; then
+if command -v sha256sum &> /dev/null; then
   PROJECT_ID=$(printf '%s' "${CWD}" | sha256sum | cut -c1-16)
 else
   PROJECT_ID=$(printf '%s' "${CWD}" | shasum -a 256 | cut -c1-16)
@@ -51,7 +51,7 @@ STOLEN=0
 STALE=0
 
 for f in "${FILES[@]}"; do
-  ENTRY=$(<"${f}") 2>/dev/null || {
+  ENTRY=$(< "${f}") 2> /dev/null || {
     STOLEN=$((STOLEN + 1))
     continue
   }
@@ -67,8 +67,8 @@ for f in "${FILES[@]}"; do
   rm -f "${f}"
 
   # Resolve ~ to $HOME for file access
-  SOURCE_FILE=$(jq -r '.file' <<<"${ENTRY}")
-  LINE=$(jq -r '.line' <<<"${ENTRY}")
+  SOURCE_FILE=$(jq -r '.file' <<< "${ENTRY}")
+  LINE=$(jq -r '.line' <<< "${ENTRY}")
   SOURCE_PATH="${SOURCE_FILE/#\~/${HOME}}"
 
   # Verify the trigger is still present on the referenced line

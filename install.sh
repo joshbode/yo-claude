@@ -13,7 +13,7 @@ if [[ ! -f ${HOOK_PATH} ]]; then
   exit 1
 fi
 
-if ! command -v jq &>/dev/null; then
+if ! command -v jq &> /dev/null; then
   echo "Error: jq is required" >&2
   exit 1
 fi
@@ -21,7 +21,7 @@ fi
 # Ensure settings file exists
 if [[ ! -f ${SETTINGS} ]]; then
   mkdir -p "$(dirname "${SETTINGS}")"
-  echo '{}' >"${SETTINGS}"
+  echo '{}' > "${SETTINGS}"
 fi
 
 # shellcheck disable=SC2016
@@ -31,7 +31,7 @@ INSTALLED=0
 
 for event in "${EVENTS[@]}"; do
   # Skip if already installed for this event
-  if jq -e --arg cmd "${HOOK_PATH}" ".hooks.${event} // [] | map(.hooks // []) | flatten | map(select(.command == \$cmd)) | length > 0" "${SETTINGS}" &>/dev/null; then
+  if jq -e --arg cmd "${HOOK_PATH}" ".hooks.${event} // [] | map(.hooks // []) | flatten | map(select(.command == \$cmd)) | length > 0" "${SETTINGS}" &> /dev/null; then
     echo "yo-claude ${event} hook is already installed."
     continue
   fi
@@ -41,7 +41,7 @@ for event in "${EVENTS[@]}"; do
     .hooks.${event} //= [] |
     .hooks.${event} += ${HOOK_ENTRY}
   " "${SETTINGS}")
-  echo "${UPDATED}" >"${SETTINGS}"
+  echo "${UPDATED}" > "${SETTINGS}"
   echo "Installed yo-claude ${event} hook."
   INSTALLED=$((INSTALLED + 1))
 done
