@@ -12,6 +12,15 @@ STALE_MS="${YO_CLAUDE_STALE_MS:-900000}" # 15 minutes
 PAYLOAD=$(cat)
 CWD=$(jq -r '.cwd' <<<"${PAYLOAD}")
 EVENT=$(jq -r '.hook_event_name // "Stop"' <<<"${PAYLOAD}")
+PROMPT=$(jq -r '.prompt // ""' <<<"${PAYLOAD}")
+
+# Block trivial prompts (e.g. ".") that were only meant to wake the hook
+block_if_trivial() {
+  if [[ ${EVENT} == "UserPromptSubmit" && ${PROMPT} =~ ^[[:space:]]*[.][[:space:]]*$ ]]; then
+    jq -n '{ decision: "block", reason: "yo-claude: nothing queued" }'
+    exit 0
+  fi
+}
 
 # Project ID: hash of cwd (sha256sum on linux, shasum on macos)
 if command -v sha256sum &>/dev/null; then
@@ -23,12 +32,14 @@ QUEUE_DIR="${HOME}/.claude/yo-claude/${PROJECT_ID}"
 
 # Nothing queued
 if [[ ! -d ${QUEUE_DIR} ]]; then
+  block_if_trivial
   exit 0
 fi
 
 # Collect queue files in order
 FILES=("${QUEUE_DIR}"/*.json)
 if ! ((${#FILES[@]})); then
+  block_if_trivial
   exit 0
 fi
 
@@ -85,6 +96,7 @@ fi
 
 # Nothing left after filtering
 if ! ((PICKED)); then
+  block_if_trivial
   exit 0
 fi
 

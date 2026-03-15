@@ -42,6 +42,35 @@ queue_entry() {
   [[ -z ${output} ]]
 }
 
+@test "dot prompt blocked when nothing queued (no queue dir)" {
+  run bash "${HOOK}" <<< "$(payload --arg hook_event_name UserPromptSubmit --arg prompt '.')"
+  [[ ${status} -eq 0 ]]
+  echo "${output}" | jq -e '.decision == "block"'
+}
+
+@test "dot prompt blocked when nothing queued (empty queue dir)" {
+  mkdir -p "${QUEUE_DIR}"
+  run bash "${HOOK}" <<< "$(payload --arg hook_event_name UserPromptSubmit --arg prompt '.')"
+  [[ ${status} -eq 0 ]]
+  echo "${output}" | jq -e '.decision == "block"'
+}
+
+@test "dot prompt allowed through when work is queued" {
+  mkdir -p "${QUEUE_DIR}"
+  echo '-- CLAUDE: fix this' > "${PROJECT}/test.lua"
+  queue_entry "${PROJECT}/test.lua" 1 > "${QUEUE_DIR}/${NOW_MS}.json"
+
+  run bash "${HOOK}" <<< "$(payload --arg hook_event_name UserPromptSubmit --arg prompt '.')"
+  [[ ${status} -eq 0 ]]
+  echo "${output}" | jq -e '.hookSpecificOutput.additionalContext'
+}
+
+@test "dot prompt not blocked for Stop event" {
+  run bash "${HOOK}" <<< "$(payload --arg prompt '.')"
+  [[ ${status} -eq 0 ]]
+  [[ -z ${output} ]]
+}
+
 @test "valid entry produces Stop block output" {
   mkdir -p "${QUEUE_DIR}"
   echo '-- CLAUDE: fix this' > "${PROJECT}/test.lua"

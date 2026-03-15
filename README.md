@@ -20,6 +20,9 @@ function fetchData(url: string) {
 Remove the comment or delete the queue file to withdraw a request before it's
 picked up.
 
+If Claude is idle when you queue a comment, type `.` and press Enter to wake it
+up. The hook will pick up the queued work without wasting a model request.
+
 ## Installation
 
 ### Hook (required)
