@@ -1,5 +1,7 @@
 -- Test runner: discovers and runs all test_*.lua files
-local test_dir = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":h")
+local info = debug.getinfo(1, "S")
+assert(info, "failed to get debug info")
+local test_dir = vim.fn.fnamemodify(info.source:sub(2), ":h")
 local files = vim.fn.glob(test_dir .. "/test_*.lua", false, true)
 table.sort(files)
 

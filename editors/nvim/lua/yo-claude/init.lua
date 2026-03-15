@@ -26,12 +26,12 @@ local defaults = {
 ---@type yo-claude.Config
 M.config = vim.deepcopy(defaults)
 
----@param opts? yo-claude.Config
+---@param opts? { trigger?: string, scan_on?: vim.api.keyset.events[], keymap?: string, root_markers?: string[] }
 function M.setup(opts)
   if opts then
-    M.config = vim.tbl_deep_extend("force", defaults, opts) --[[@as yo-claude.Config]]
+    M.config = vim.tbl_deep_extend("force", defaults, opts --[[@as yo-claude.Config]])
   end
-  if vim.env.YO_CLAUDE_TRIGGER then
+  if vim.env.YO_CLAUDE_TRIGGER then ---@diagnostic disable-line: unnecessary-if
     M.config.trigger = vim.env.YO_CLAUDE_TRIGGER
   end
 

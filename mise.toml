@@ -18,11 +18,14 @@ depends = ["test:lua", "test:hook"]
 
 [tasks."test:lua"]
 description = "Run Lua tests in headless neovim"
+sources = ["editors/nvim/**/*.lua"]
+dir = "editors/nvim"
 run = 'nvim --headless --clean -u tests/minimal_init.lua -c "luafile tests/run.lua"'
 
 [tasks."test:hook"]
 description = "Run hook script tests with bats"
-run = "bats tests/test_hook.bats"
+sources = ["hooks/yo-claude-hook.sh", "tests/test_hook.bats"]
+run = "tests/test_hook.bats"
 
 [tasks.check]
 description = "Run all linters"
@@ -30,6 +33,7 @@ depends = ["check:shell", "check:lua"]
 
 [tasks."check:shell"]
 description = "Lint and format-check shell scripts"
+sources = ["**/*.sh", "**/*.bats", ".editorconfig"]
 run = '''
 #! /usr/bin/env bash
 
@@ -46,23 +50,20 @@ depends = ["check:lua:style", "check:lua:types"]
 
 [tasks."check:lua:style"]
 description = "Check Lua formatting"
-run = "stylua --check editors/nvim/lua/ tests/"
+sources = ["**/*.lua", "stylua.toml"]
+run = "stylua --check editors/nvim/"
 
 [tasks."check:lua:types"]
 description = "Type-check Lua files with emmylua_check"
+sources = ["editors/nvim/**/*.lua", "editors/nvim/.luarc.json"]
 dir = "editors/nvim"
 run = '''
 #! /usr/bin/env bash
 
 # shellcheck disable=SC2016
 VIMRUNTIME="$(nvim --headless --clean +'lua io.write(vim.env.VIMRUNTIME)' +'qa' 2>/dev/null)"
-CONFIG=$(mktemp "${TMPDIR:-/tmp}/yo-claude-luarc.XXXXXX")
-trap 'rm -f "${CONFIG}"' EXIT
-jq \
-  --arg vr "${VIMRUNTIME}" \
-  '.workspace.library |= map(if . == "$VIMRUNTIME" then $vr else . end)' \
-  .luarc.json > "${CONFIG}"
-emmylua_check --config "${CONFIG}" lua/
+export VIMRUNTIME
+emmylua_check .
 '''
 
 [tasks.pre-commit]
@@ -81,7 +82,7 @@ while IFS= read -r file; do
     *.sh|*.bats) SH_FILES+=("${file}") ;;
     *.lua) LUA_FILES+=("${file}") ;;
   esac
-done < <(git diff-index --cached --name-only HEAD)
+done < <(git diff-index --cached --name-only --diff-filter=d HEAD)
 
 if ((${#SH_FILES[@]})); then
   shfmt -w "${SH_FILES[@]}"
@@ -129,7 +130,7 @@ shfmt -w -- **/*.sh **/*.bats
 
 [tasks."fmt:lua"]
 description = "Format Lua files"
-run = "stylua editors/nvim/lua/"
+run = "stylua editors/nvim/"
 
 [tasks."hook:install"]
 description = "Install the Claude Code hook"
