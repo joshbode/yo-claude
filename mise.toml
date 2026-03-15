@@ -1,0 +1,124 @@
+[tools]
+neovim = "latest"
+shellcheck = "latest"
+shfmt = "latest"
+jq = "latest"
+bats = "latest"
+stylua = "latest"
+
+[tools."github:CppCXY/emmylua-analyzer-rust"]
+version = "latest"
+filter_bins = ["emmylua_check"]
+platforms.linux-x64 = { asset_pattern = "emmylua_check-linux-x64.tar.gz" }
+platforms.macos-arm64 = { asset_pattern = "emmylua_check-darwin-arm64.tar.gz" }
+
+[tasks.test]
+description = "Run all tests"
+depends = ["test:lua", "test:hook"]
+
+[tasks."test:lua"]
+description = "Run Lua tests in headless neovim"
+run = 'nvim --headless --clean -u tests/minimal_init.lua -c "luafile tests/run.lua"'
+
+[tasks."test:hook"]
+description = "Run hook script tests with bats"
+run = "bats tests/test_hook.bats"
+
+[tasks.check]
+description = "Run all linters"
+depends = ["check:shell", "check:lua"]
+
+[tasks."check:shell"]
+description = "Lint and format-check shell scripts"
+run = """
+shellcheck hooks/yo-claude-hook.sh install.sh uninstall.sh tests/test_hook.bats
+shfmt -d hooks/yo-claude-hook.sh install.sh uninstall.sh
+shfmt --ln bats -i 2 -sr -d tests/test_hook.bats
+"""
+
+[tasks."check:lua"]
+description = "Lint and format-check Lua files"
+depends = ["check:lua:style", "check:lua:types"]
+
+[tasks."check:lua:style"]
+description = "Check Lua formatting"
+run = "stylua --check editors/nvim/lua/ tests/"
+
+[tasks."check:lua:types"]
+description = "Type-check Lua files with emmylua_check"
+dir = "editors/nvim"
+run = '''
+#! /usr/bin/env bash
+
+# shellcheck disable=SC2016
+VIMRUNTIME="$(nvim --headless --clean +'lua io.write(vim.env.VIMRUNTIME)' +'qa' 2>/dev/null)"
+CONFIG=$(mktemp "${TMPDIR:-/tmp}/yo-claude-luarc.XXXXXX")
+trap 'rm -f "${CONFIG}"' EXIT
+jq \
+  --arg vr "${VIMRUNTIME}" \
+  '.workspace.library |= map(if . == "$VIMRUNTIME" then $vr else . end)' \
+  .luarc.json > "${CONFIG}"
+emmylua_check --config "${CONFIG}" lua/
+'''
+
+[tasks.pre-commit]
+description = "Pre-commit hook: lint + test changed files"
+quiet = true
+run = '''
+#! /usr/bin/env bash
+
+# {% raw %}
+set -eu
+
+SH_FILES=()
+LUA_FILES=()
+while IFS= read -r file; do
+  case "${file}" in
+    *.sh) SH_FILES+=("${file}") ;;
+    *.lua) LUA_FILES+=("${file}") ;;
+  esac
+done < <(git diff-index --cached --name-only HEAD)
+
+if ((${#SH_FILES[@]})); then
+  shellcheck "${SH_FILES[@]}"
+  shfmt -d "${SH_FILES[@]}"
+fi
+
+if ((${#LUA_FILES[@]})); then
+  stylua --check "${LUA_FILES[@]}"
+  mise run check:lua:types
+  mise run test
+fi
+# {% endraw %}
+'''
+
+[tasks."pre-commit:install"]
+description = "Install the pre-commit hook"
+quiet = true
+run = '''
+#! /usr/bin/env bash
+
+HOOK_FILE="${MISE_PROJECT_ROOT}/.git/hooks/pre-commit"
+cat > "${HOOK_FILE}" << EOF
+#! /bin/sh
+exec mise run pre-commit
+EOF
+chmod +x "${HOOK_FILE}"
+echo "Installed pre-commit hook"
+'''
+
+[tasks.fmt]
+description = "Format all files"
+run = """
+shfmt -w hooks/yo-claude-hook.sh install.sh uninstall.sh
+shfmt --ln bats -i 2 -sr -w tests/test_hook.bats
+stylua editors/nvim/lua/
+"""
+
+[tasks."hook:install"]
+description = "Install the Claude Code hook"
+run = "./install.sh"
+
+[tasks."hook:uninstall"]
+description = "Uninstall the Claude Code hook"
+run = "./uninstall.sh"

@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MISE_AUTO_INSTALL: "0"
+
+jobs:
+  lint-shell:
+    name: Lint shell
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+        with:
+          install: false
+      - run: mise install shellcheck shfmt
+      - run: mise run check:shell
+
+  lint-lua-style:
+    name: Lint Lua style
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+        with:
+          install: false
+      - run: mise install stylua
+      - run: mise run check:lua:style
+
+  lint-lua-types:
+    name: Lint Lua types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+        with:
+          install: false
+      - run: mise install neovim jq "github:CppCXY/emmylua-analyzer-rust"
+      - run: mise run check:lua:types
+
+  test-lua:
+    name: Test Lua (neovim ${{ matrix.neovim }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        neovim: [stable, nightly]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+        with:
+          install: false
+      - run: mise install neovim@${{ matrix.neovim }}
+      - run: nvim --version
+      - run: mise run test:lua
+
+  test-hook:
+    name: Test hook
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+        with:
+          install: false
+      - run: mise install bats jq
+      - run: mise run test:hook
