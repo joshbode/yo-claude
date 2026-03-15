@@ -1,5 +1,5 @@
 [tools]
-neovim = "latest"
+neovim = "nightly"
 shellcheck = "latest"
 shfmt = "latest"
 jq = "latest"

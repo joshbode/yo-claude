@@ -60,7 +60,11 @@ jobs:
           install: false
       - run: mise install neovim@${{ matrix.neovim }}
       - run: nvim --version
+        env:
+          MISE_NEOVIM_VERSION: ${{ matrix.neovim }}
       - run: mise run test:lua
+        env:
+          MISE_NEOVIM_VERSION: ${{ matrix.neovim }}
 
   test-hook:
     name: Test hook
