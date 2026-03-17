@@ -49,3 +49,16 @@ done
 if ! ((INSTALLED)); then
   echo "Nothing to do — all hooks already installed."
 fi
+
+# Install statusLine
+CURRENT_STATUS=$(jq -r '.statusLine.command // ""' "${SETTINGS}")
+if [[ ${CURRENT_STATUS} == "${HOOK_PATH}" ]]; then
+  echo "yo-claude statusLine is already installed."
+else
+  if [[ -n ${CURRENT_STATUS} ]]; then
+    echo "Warning: replacing existing statusLine command: ${CURRENT_STATUS}"
+  fi
+  UPDATED=$(jq --arg cmd "${HOOK_PATH}" '.statusLine = { type: "command", command: $cmd }' "${SETTINGS}")
+  echo "${UPDATED}" > "${SETTINGS}"
+  echo "Installed yo-claude statusLine."
+fi

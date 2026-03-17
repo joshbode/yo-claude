@@ -31,4 +31,12 @@ for event in "${EVENTS[@]}"; do
   echo "${UPDATED}" > "${SETTINGS}"
 done
 
+# Remove statusLine if it's ours
+CURRENT_STATUS=$(jq -r '.statusLine.command // ""' "${SETTINGS}")
+if [[ ${CURRENT_STATUS} == "${HOOK_PATH}" ]]; then
+  UPDATED=$(jq 'del(.statusLine)' "${SETTINGS}")
+  echo "${UPDATED}" > "${SETTINGS}"
+  echo "Removed yo-claude statusLine."
+fi
+
 echo "Removed yo-claude hooks from ${SETTINGS}"

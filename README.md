@@ -43,6 +43,12 @@ To uninstall:
 ./uninstall.sh
 ```
 
+### Status Line (optional)
+
+The install script also configures Claude Code's `statusLine` to show the current
+working directory and the number of queued prompts. This makes it easy to see at
+a glance when trigger comments are waiting to be picked up.
+
 ### Editor Plugin
 
 - [Neovim](editors/nvim/README.md)

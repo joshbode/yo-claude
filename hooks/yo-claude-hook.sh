@@ -1,7 +1,7 @@
 #! /usr/bin/env bash
 
-# yo-claude hook — works for both Stop and UserPromptSubmit events.
-# Checks the queue for pending prompts and injects them as context.
+# yo-claude — unified hook and statusLine script.
+# Handles Stop, UserPromptSubmit, and statusLine (no hook_event_name).
 
 set -euo pipefail
 shopt -s nullglob
@@ -11,16 +11,8 @@ STALE_MS="${YO_CLAUDE_STALE_MS:-900000}" # 15 minutes
 
 PAYLOAD=$(cat)
 CWD=$(jq -r '.cwd' <<< "${PAYLOAD}")
-EVENT=$(jq -r '.hook_event_name // "Stop"' <<< "${PAYLOAD}")
+EVENT=$(jq -r '.hook_event_name // ""' <<< "${PAYLOAD}")
 PROMPT=$(jq -r '.prompt // ""' <<< "${PAYLOAD}")
-
-# Block trivial prompts (e.g. ".") that were only meant to wake the hook
-block_if_trivial() {
-  if [[ ${EVENT} == "UserPromptSubmit" && ${PROMPT} =~ ^[[:space:]]*[.][[:space:]]*$ ]]; then
-    jq -n '{ decision: "block", reason: "yo-claude: nothing queued" }'
-    exit 0
-  fi
-}
 
 # Project ID: hash of cwd (sha256sum on linux, shasum on macos)
 if command -v sha256sum &> /dev/null; then
@@ -29,6 +21,29 @@ else
   PROJECT_ID=$(printf '%s' "${CWD}" | shasum -a 256 | cut -c1-16)
 fi
 QUEUE_DIR="${HOME}/.claude/yo-claude/${PROJECT_ID}"
+
+# --- statusLine mode: display cwd + queue count ---
+if [[ -z ${EVENT} ]]; then
+  URL="file://${HOSTNAME:-$(hostname)}${CWD}"
+  NAME=${CWD//${HOME}/\~}
+  STATUS=$(printf $"\e]8;;%s\e\\%s\e]8;;\e\\" "${URL}" "${NAME}")
+
+  FILES=("${QUEUE_DIR}"/*.json)
+  STATUS="${STATUS} [$(printf $"\e[33m%d queued\e[0m" "${#FILES[@]}")]"
+
+  printf '%s\n' "${STATUS}"
+  exit 0
+fi
+
+# --- hook mode: process queued prompts ---
+
+# Block trivial prompts (e.g. ".") that were only meant to wake the hook
+block_if_trivial() {
+  if [[ ${EVENT} == "UserPromptSubmit" && ${PROMPT} =~ ^[[:space:]]*[.][[:space:]]*$ ]]; then
+    jq -n '{ decision: "block", reason: "yo-claude: nothing queued" }'
+    exit 0
+  fi
+}
 
 # Nothing queued
 if [[ ! -d ${QUEUE_DIR} ]]; then
