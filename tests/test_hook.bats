@@ -11,7 +11,7 @@ project_id() {
 }
 
 setup() {
-  PROJECT=$(mktemp -d)
+  PROJECT=$(mktemp -d "${TMPDIR:-/tmp}/yo-claude-test-XXXXXXXX")
   ID=$(project_id "${PROJECT}")
   QUEUE_DIR="${HOME}/.claude/yo-claude/${ID}"
   NOW_MS=$(($(date +%s) * 1000))
@@ -30,16 +30,33 @@ queue_entry() {
 }
 
 @test "no queue dir produces no output" {
-  run bash "${HOOK}" <<< '{"cwd":"/nonexistent/path"}'
+  rm -r "${QUEUE_DIR}" 2> /dev/null || true
+  run bash "${HOOK}" <<< "$(payload --arg hook_event_name Stop)"
   [[ ${status} -eq 0 ]]
   [[ -z ${output} ]]
 }
 
 @test "empty queue dir produces no output" {
   mkdir -p "${QUEUE_DIR}"
-  run bash "${HOOK}" <<< "$(payload)"
+  run bash "${HOOK}" <<< "$(payload --arg hook_event_name Stop)"
   [[ ${status} -eq 0 ]]
   [[ -z ${output} ]]
+}
+
+@test "statusLine shows queue count" {
+  mkdir -p "${QUEUE_DIR}"
+  echo '-- CLAUDE: fix this' > "${PROJECT}/test.lua"
+  queue_entry "${PROJECT}/test.lua" 1 > "${QUEUE_DIR}/${NOW_MS}.json"
+
+  run bash "${HOOK}" <<< "$(payload)"
+  [[ ${status} -eq 0 ]]
+  [[ ${output} == *"1 queued"* ]]
+}
+
+@test "statusLine shows zero when queue empty" {
+  run bash "${HOOK}" <<< "$(payload)"
+  [[ ${status} -eq 0 ]]
+  [[ ${output} == *"0 queued"* ]]
 }
 
 @test "dot prompt blocked when nothing queued (no queue dir)" {
@@ -66,7 +83,7 @@ queue_entry() {
 }
 
 @test "dot prompt not blocked for Stop event" {
-  run bash "${HOOK}" <<< "$(payload --arg prompt '.')"
+  run bash "${HOOK}" <<< "$(payload --arg hook_event_name Stop --arg prompt '.')"
   [[ ${status} -eq 0 ]]
   [[ -z ${output} ]]
 }
@@ -76,7 +93,7 @@ queue_entry() {
   echo '-- CLAUDE: fix this' > "${PROJECT}/test.lua"
   queue_entry "${PROJECT}/test.lua" 1 > "${QUEUE_DIR}/${NOW_MS}.json"
 
-  run bash "${HOOK}" <<< "$(payload)"
+  run bash "${HOOK}" <<< "$(payload --arg hook_event_name Stop)"
   [[ ${status} -eq 0 ]]
   echo "${output}" | jq -e '.decision == "block"'
 }
@@ -86,7 +103,7 @@ queue_entry() {
   echo '-- CLAUDE: fix this' > "${PROJECT}/test.lua"
   queue_entry "${PROJECT}/test.lua" 1 > "${QUEUE_DIR}/${NOW_MS}.json"
 
-  bash "${HOOK}" <<< "$(payload)" > /dev/null
+  bash "${HOOK}" <<< "$(payload --arg hook_event_name Stop)" > /dev/null
   files=("${QUEUE_DIR}"/*.json)
   [[ ${#files[@]} -eq 0 || ! -e ${files[0]} ]]
 }
@@ -97,7 +114,7 @@ queue_entry() {
   STALE_MS=$((NOW_MS - 1000000))
   queue_entry "${PROJECT}/test.lua" 1 > "${QUEUE_DIR}/${STALE_MS}.json"
 
-  run bash "${HOOK}" <<< "$(payload)"
+  run bash "${HOOK}" <<< "$(payload --arg hook_event_name Stop)"
   [[ ${status} -eq 0 ]]
   [[ -z ${output} ]]
 }
@@ -107,7 +124,7 @@ queue_entry() {
   echo 'local x = 1' > "${PROJECT}/test.lua"
   queue_entry "${PROJECT}/test.lua" 1 > "${QUEUE_DIR}/${NOW_MS}.json"
 
-  run bash "${HOOK}" <<< "$(payload)"
+  run bash "${HOOK}" <<< "$(payload --arg hook_event_name Stop)"
   [[ ${status} -eq 0 ]]
   [[ -z ${output} ]]
 }
@@ -129,7 +146,7 @@ queue_entry() {
   queue_entry "${PROJECT}/a.lua" 1 > "${QUEUE_DIR}/${NOW_MS}.json"
   queue_entry "${PROJECT}/b.lua" 1 > "${QUEUE_DIR}/$((NOW_MS + 1)).json"
 
-  run bash "${HOOK}" <<< "$(payload)"
+  run bash "${HOOK}" <<< "$(payload --arg hook_event_name Stop)"
   [[ ${status} -eq 0 ]]
   echo "${output}" | jq -e '.reason | contains("a.lua:1")'
   echo "${output}" | jq -e '.reason | contains("b.lua:1")'
